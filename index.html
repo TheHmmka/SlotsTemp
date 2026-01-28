@@ -62,6 +62,23 @@
       canvas.style.background = "url('" + buildUrl + "/" + bgName.replace(/'/g, "%27") + "') center / cover";
     }
 
+    window.sendToHost = function(type, payload) {
+  var message = {
+    type: type,
+    payload: (payload !== undefined && payload !== null) ? payload : null,
+    ts: Date.now()
+  };
+
+  if (window.webkit &&
+      window.webkit.messageHandlers &&
+      window.webkit.messageHandlers.unity) {
+    window.webkit.messageHandlers.unity.postMessage(message);
+    return;
+  }
+
+  console.log("[HostEvent]", message);
+};
+
     const initParams = getInitParams();
 
     const config = {
