@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>Slots</title>
+</head>
+
+<body style="
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: black;
+">
+  <canvas
+    id="unity-canvas"
+    tabindex="-1"
+    style="
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background: black;
+    ">
+  </canvas>
+
+  <script>
+    // Папка билда по умолчанию
+    const buildUrl = "Build";
+    const loaderUrl = buildUrl + "/Web.loader.js";
+
+    function getInitParams() {
+      const url = new URL(window.location.href);
+      const currency = url.searchParams.get("currency") || "EUR";
+      const balanceStr = url.searchParams.get("balance") || "0";
+      const balance = Number(balanceStr);
+
+      return {
+        currency,
+        balance: Number.isFinite(balance) ? balance : 0
+      };
+    }
+
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      const meta = document.createElement("meta");
+      meta.name = "viewport";
+      meta.content = "width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes";
+      document.head.appendChild(meta);
+
+      const canvas = document.querySelector("#unity-canvas");
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      canvas.style.position = "fixed";
+      document.body.style.textAlign = "left";
+    }
+
+    // (опционально) фон из Splash Image, если задан
+    const canvas = document.querySelector("#unity-canvas");
+    const bgName = "Web.jpg";
+    if (bgName && bgName.length > 0) {
+      canvas.style.background = "url('" + buildUrl + "/" + bgName.replace(/'/g, "%27") + "') center / cover";
+    }
+
+    const initParams = getInitParams();
+
+    const config = {
+      arguments: [],
+      dataUrl: buildUrl + "/Web.data",
+      frameworkUrl: buildUrl + "/Web.framework.js",
+      codeUrl: buildUrl + "/Web.wasm",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "DefaultCompany",
+      productName: "Slots",
+      productVersion: "2.0.0",
+    };
+
+    // loader.js
+    const script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = () => {
+      createUnityInstance(canvas, config).then((unityInstance) => {
+  window.unityInstance = unityInstance;
+
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.floor(window.innerWidth * dpr);
+    const height = Math.floor(window.innerHeight * dpr);
+
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+  window.addEventListener("orientationchange", resizeCanvas);
+  resizeCanvas();
+
+  const payload = JSON.stringify(initParams);
+  unityInstance.SendMessage("Bridge", "ApplyInitParams", payload);
+});
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>
