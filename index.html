@@ -160,13 +160,13 @@
     const script = document.createElement("script");
     script.src = loaderUrl;
     script.onload = () => {
-      const onProgress = (progress) => {
-        // progress: 0..1
-        const pct = Math.round(progress * 100);
-        showLoading(`Loading assets… ${pct}%`);
-      };
+      // const onProgress = (progress) => {
+      //   // progress: 0..1
+      //   const pct = Math.round(progress * 100);
+      //   showLoading(`Loading assets… ${pct}%`);
+      // };
 
-      createUnityInstance(canvas, config, onProgress).then( (unityInstance) => {
+      createUnityInstance(canvas, config).then( (unityInstance) => {
         window.unityInstance = unityInstance;
 
         function resizeCanvas() {
