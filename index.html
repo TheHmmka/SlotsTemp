@@ -4,99 +4,65 @@
   <meta charset="utf-8" />
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <title>Slots2</title>
-
-  <!-- ВАЖНО: meta viewport должен быть в HEAD сразу -->
-  <meta name="viewport"
-        content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-
   <style>
-    :root {
-      /* JS будет обновлять это значение в пикселях */
-      --app-height: 100vh;
-    }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: var(--app-height);
-      overflow: hidden;
-      background: #000;
-      -webkit-text-size-adjust: 100%;
-      touch-action: none;
-    }
-
-    /* Контейнер для canvas, чтобы 100% было предсказуемым */
-    #unity-container {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: var(--app-height);
-      background: #000;
-
-      /* Не обязательно, но полезно для "стабильного" layout в iOS */
-      padding-top: env(safe-area-inset-top);
-      padding-right: env(safe-area-inset-right);
-      padding-bottom: env(safe-area-inset-bottom);
-      padding-left: env(safe-area-inset-left);
-
-      box-sizing: border-box;
-    }
-
-    /* Сам canvas всегда растягиваем на контейнер */
-    #unity-canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      outline: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    #loading-overlay{
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0.65);
-      z-index: 9999;
-      opacity: 1;
-      transition: opacity .25s ease;
-      pointer-events: all;
-    }
-    #loading-overlay.hidden{
-      opacity: 0;
-      pointer-events: none;
-    }
-    .spinner{
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      border: 5px solid rgba(255,255,255,0.22);
-      border-top-color: rgba(255,255,255,0.95);
-      animation: spin .9s linear infinite;
-    }
-    @keyframes spin{ to { transform: rotate(360deg); } }
-    .loading-text{
-      font: 600 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      color: rgba(255,255,255,0.95);
-    }
-    .loading-subtext{
-      font: 400 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      color: rgba(255,255,255,0.7);
-      max-width: 80vw;
-      text-align: center;
-    }
-  </style>
+  #loading-overlay{
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.65);
+    z-index: 9999;
+    opacity: 1;
+    transition: opacity .25s ease;
+    pointer-events: all;
+  }
+  #loading-overlay.hidden{
+    opacity: 0;
+    pointer-events: none;
+  }
+  .spinner{
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 5px solid rgba(255,255,255,0.22);
+    border-top-color: rgba(255,255,255,0.95);
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin{ to { transform: rotate(360deg); } }
+  .loading-text{
+    font: 600 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    color: rgba(255,255,255,0.95);
+  }
+  .loading-subtext{
+    font: 400 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    color: rgba(255,255,255,0.7);
+    max-width: 80vw;
+    text-align: center;
+  }
+</style>
 </head>
 
-<body>
-  <div id="unity-container">
-    <canvas id="unity-canvas" tabindex="-1"></canvas>
-  </div>
+<body style="
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: black;
+">
+  <canvas
+    id="unity-canvas"
+    tabindex="-1"
+    style="
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background: black;
+    ">
+  </canvas>
 
   <div id="loading-overlay" aria-live="polite">
     <div class="spinner" role="status" aria-label="Loading"></div>
@@ -105,7 +71,7 @@
   </div>
 
   <script>
-    // --- Конфиги Unity ---
+    // Папка билда по умолчанию
     const buildUrl = "Build";
     const loaderUrl = buildUrl + "/Web.loader.js";
 
@@ -124,88 +90,43 @@
       };
     }
 
-    // --- Фикс высоты на iOS: вместо 100vh используем visualViewport.height ---
-    function setAppHeight() {
-      // visualViewport на iOS даёт более стабильную высоту, чем innerHeight/100vh
-      const vv = window.visualViewport;
-      const h = vv ? Math.round(vv.height) : Math.round(window.innerHeight);
-      document.documentElement.style.setProperty("--app-height", h + "px");
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      const meta = document.createElement("meta");
+      meta.name = "viewport";
+      meta.content = "width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes";
+      document.head.appendChild(meta);
+
+      const canvas = document.querySelector("#unity-canvas");
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      canvas.style.position = "fixed";
+      document.body.style.textAlign = "left";
     }
-
-    // Дёргаем несколько раз — iOS иногда пересчитывает viewport после первого кадра
-    function primeAppHeight() {
-      setAppHeight();
-      requestAnimationFrame(setAppHeight);
-      setTimeout(setAppHeight, 50);
-      setTimeout(setAppHeight, 250);
-    }
-
-    window.addEventListener("resize", () => {
-      setAppHeight();
-      resizeCanvas();
-    });
-
-    window.addEventListener("orientationchange", () => {
-      primeAppHeight();
-      resizeCanvas();
-    });
-
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", () => {
-        setAppHeight();
-        resizeCanvas();
-      });
-      window.visualViewport.addEventListener("scroll", () => {
-        // iOS может менять vv.height при появлении/скрытии панелей
-        setAppHeight();
-        resizeCanvas();
-      });
-    }
-
-    // --- Сообщения в хост (iOS) ---
-    window.sendToHost = function(type, payload) {
-      var message = {
-        type: type,
-        payload: (payload !== undefined && payload !== null) ? payload : null,
-        ts: Date.now()
-      };
-
-      if (window.webkit &&
-          window.webkit.messageHandlers &&
-          window.webkit.messageHandlers.unity) {
-        window.webkit.messageHandlers.unity.postMessage(message);
-        return;
-      }
-
-      console.log("[HostEvent]", message);
-    };
-
-    // --- Loading overlay helpers ---
-    const overlay = document.getElementById("loading-overlay");
-    const overlaySub = document.getElementById("loading-subtext");
-
-    function showLoading(text) {
-      if (overlaySub) overlaySub.textContent = text || "";
-      overlay && overlay.classList.remove("hidden");
-    }
-
-    function hideLoading() {
-      overlay && overlay.classList.add("hidden");
-      setTimeout(() => overlay && overlay.remove(), 300);
-    }
-
-    showLoading("");
-
-    // --- Canvas refs ---
-    const canvas = document.getElementById("unity-canvas");
 
     // (опционально) фон из Splash Image, если задан
+    const canvas = document.querySelector("#unity-canvas");
     const bgName = "Web.jpg";
     if (bgName && bgName.length > 0) {
       canvas.style.background = "url('" + buildUrl + "/" + bgName.replace(/'/g, "%27") + "') center / cover";
     }
 
-    // --- Unity config ---
+    window.sendToHost = function(type, payload) {
+  var message = {
+    type: type,
+    payload: (payload !== undefined && payload !== null) ? payload : null,
+    ts: Date.now()
+  };
+
+  if (window.webkit &&
+      window.webkit.messageHandlers &&
+      window.webkit.messageHandlers.unity) {
+    window.webkit.messageHandlers.unity.postMessage(message);
+    return;
+  }
+
+  console.log("[HostEvent]", message);
+};
+
     const initParams = getInitParams();
 
     const config = {
@@ -219,54 +140,55 @@
       productVersion: "1.5.0",
     };
 
-    // --- Resize canvas (важно: используем vv.height, чтобы совпадало с app-height) ---
-    function resizeCanvas() {
-      const dpr = window.devicePixelRatio || 1;
+    const overlay = document.getElementById("loading-overlay");
+    const overlaySub = document.getElementById("loading-subtext");
 
-      const vv = window.visualViewport;
-      const cssW = Math.round(window.innerWidth);
-      const cssH = vv ? Math.round(vv.height) : Math.round(window.innerHeight);
-
-      const width = Math.floor(cssW * dpr);
-      const height = Math.floor(cssH * dpr);
-
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-      }
+    function showLoading(text) {
+      if (overlaySub) overlaySub.textContent = text || "";
+      overlay?.classList.remove("hidden");
     }
 
-    // Стабилизируем высоту ДО загрузки Unity
-    primeAppHeight();
-    resizeCanvas();
+    function hideLoading() {
+      overlay?.classList.add("hidden");
+      // если хочешь полностью удалить из DOM:
+      setTimeout(() => overlay?.remove(), 300);
+    }
 
-    // --- Load unity loader ---
+    showLoading("");
+
+    // loader.js
     const script = document.createElement("script");
     script.src = loaderUrl;
-
     script.onload = () => {
-      createUnityInstance(canvas, config).then((unityInstance) => {
+      // const onProgress = (progress) => {
+      //   // progress: 0..1
+      //   const pct = Math.round(progress * 100);
+      //   showLoading(`Loading assets… ${pct}%`);
+      // };
+
+      createUnityInstance(canvas, config).then( (unityInstance) => {
         window.unityInstance = unityInstance;
 
-        // ещё раз после создания Unity — иногда Unity меняет размер
-        primeAppHeight();
+        function resizeCanvas() {
+          const dpr = window.devicePixelRatio || 1;
+          const width = Math.floor(window.innerWidth * dpr);
+          const height = Math.floor(window.innerHeight * dpr);
+
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+          }
+        }
+
+        window.addEventListener("resize", resizeCanvas);
+        window.addEventListener("orientationchange", resizeCanvas);
         resizeCanvas();
 
-        // применяем init params
         const payload = JSON.stringify(initParams);
         unityInstance.SendMessage("Bridge", "ApplyInitParams", payload);
 
         hideLoading();
-      }).catch((err) => {
-        console.error(err);
-        showLoading("Failed to load game");
-        window.sendToHost("error", String(err));
       });
-    };
-
-    script.onerror = () => {
-      showLoading("Failed to load loader");
-      window.sendToHost("error", "Failed to load Unity loader");
     };
 
     document.body.appendChild(script);
