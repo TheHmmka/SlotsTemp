@@ -1,42 +1,47 @@
 <!DOCTYPE html>
 <html lang="en-us">
+
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <title>Slots2</title>
 
+  <!-- Лучше сразу в head, а не динамически -->
   <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
   <style>
-    :root { --app-w: 100vw; --app-h: 100vh; }
+    :root {
+      --app-height: 100vh;
+    }
 
-    html, body {
+    html,
+    body {
       margin: 0;
       padding: 0;
       width: 100%;
-      height: var(--app-h);
+      height: var(--app-height);
       overflow: hidden;
       background: black;
-      touch-action: none;
     }
 
-    /* Canvas прибит к низу, занимает видимый viewport */
+    /* Canvas прибит к низу и занимает видимый viewport по высоте */
     #unity-canvas {
       position: fixed;
       left: 0;
       right: 0;
       bottom: 0;
-      width: var(--app-w);
-      height: var(--app-h);
+      /* <-- прибили к низу */
+      width: 100%;
+      height: var(--app-height);
+      /* <-- высота видимого viewport */
       display: block;
       background: black;
       outline: none;
       -webkit-tap-highlight-color: transparent;
-      touch-action: none;
     }
 
-    #loading-overlay{
+    #loading-overlay {
       position: fixed;
       inset: 0;
       display: flex;
@@ -44,32 +49,41 @@
       gap: 14px;
       align-items: center;
       justify-content: center;
-      background: rgba(0,0,0,0.65);
+      background: rgba(0, 0, 0, 0.65);
       z-index: 9999;
       opacity: 1;
       transition: opacity .25s ease;
       pointer-events: all;
     }
-    #loading-overlay.hidden{
+
+    #loading-overlay.hidden {
       opacity: 0;
       pointer-events: none;
     }
-    .spinner{
+
+    .spinner {
       width: 56px;
       height: 56px;
       border-radius: 50%;
-      border: 5px solid rgba(255,255,255,0.22);
-      border-top-color: rgba(255,255,255,0.95);
+      border: 5px solid rgba(255, 255, 255, 0.22);
+      border-top-color: rgba(255, 255, 255, 0.95);
       animation: spin .9s linear infinite;
     }
-    @keyframes spin{ to { transform: rotate(360deg); } }
-    .loading-text{
-      font: 600 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      color: rgba(255,255,255,0.95);
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
     }
-    .loading-subtext{
+
+    .loading-text {
+      font: 600 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: rgba(255, 255, 255, 0.95);
+    }
+
+    .loading-subtext {
       font: 400 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      color: rgba(255,255,255,0.7);
+      color: rgba(255, 255, 255, 0.7);
       max-width: 80vw;
       text-align: center;
     }
@@ -86,44 +100,100 @@
   </div>
 
   <script>
-    // -------------------------
-    //  Build paths
-    // -------------------------
     const buildUrl = "Build";
-    const loaderUrl = buildUrl + "/Web.loader.js";
+    const loaderUrl = buildUrl + "/Web3.loader.js";
 
     const canvas = document.getElementById("unity-canvas");
-    const overlay = document.getElementById("loading-overlay");
-    const overlaySub = document.getElementById("loading-subtext");
 
-    // -------------------------
-    //  Host bridge (WKWebView / fallback)
-    // -------------------------
-    window.sendToHost = function(type, payload) {
-      const message = {
-        type,
+    // ---- helper: реальная высота видимого viewport (важно для iOS/WKWebView) ----
+    function viewportHeight() {
+      // visualViewport максимально стабилен на iOS
+      return window.visualViewport ? Math.round(window.visualViewport.height) : Math.round(window.innerHeight);
+    }
+
+    function setAppHeight() {
+      const h = viewportHeight();
+      document.documentElement.style.setProperty("--app-height", h + "px");
+    }
+
+    // ---- сообщения в хост ----
+    window.sendToHost = function (type, payload) {
+      var message = {
+        type: type,
         payload: (payload !== undefined && payload !== null) ? payload : null,
         ts: Date.now()
       };
 
-      // WKWebView
       if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.unity) {
         window.webkit.messageHandlers.unity.postMessage(message);
         return;
       }
 
-      // Optional generic bridge
       if (window.unity && window.unity.postMessage) {
         window.unity.postMessage(JSON.stringify(message));
+        return;
+      }
+      
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(message, '*');
         return;
       }
 
       console.log("[HostEvent]", message);
     };
 
-    // -------------------------
-    //  Loading UI
-    // -------------------------
+    function getInitParams() {
+      const url = new URL(window.location.href);
+      const readNumberParam = (names, fallback = 0) => {
+        for (const name of names) {
+          const raw = url.searchParams.get(name);
+          if (raw === null || raw === "") continue;
+
+          const normalized = String(raw).trim().replace(",", ".");
+          const parsed = Number(normalized);
+          if (Number.isFinite(parsed)) return parsed;
+        }
+
+        return fallback;
+      };
+
+      const currency = url.searchParams.get("currency") || "EUR";
+      const balance = readNumberParam(["balance"]);
+      const bet = readNumberParam(["bet"]);
+      const winCoins = readNumberParam(["winCoins", "winAmount", "win_coins", "win_amount", "payout", "win"]);
+      const winSpinNum = Math.round(readNumberParam(["winSpinNum", "win_spin_num"]));
+
+      return {
+        currency,
+        balance,
+        bet,
+        winCoins,
+        winSpinNum
+      };
+    }
+
+    // // (опционально) фон из Splash Image
+    // const bgName = "Web3.jpg";
+    // if (bgName && bgName.length > 0) {
+    //   canvas.style.background = "url('" + buildUrl + "/" + bgName.replace(/'/g, "%27") + "') center / cover";
+    // }
+
+    const initParams = getInitParams();
+
+    const config = {
+      arguments: [],
+      dataUrl: buildUrl + "/Web3.data",
+      frameworkUrl: buildUrl + "/Web3.framework.js",
+      codeUrl: buildUrl + "/Web3.wasm",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "DefaultCompany",
+      productName: "Slots2",
+      productVersion: "1.5.0",
+    };
+
+    const overlay = document.getElementById("loading-overlay");
+    const overlaySub = document.getElementById("loading-subtext");
+
     function showLoading(text) {
       if (overlaySub) overlaySub.textContent = text || "";
       overlay && overlay.classList.remove("hidden");
@@ -136,124 +206,47 @@
 
     showLoading("");
 
-    // -------------------------
-    //  Init params from URL
-    // -------------------------
-    function getInitParams() {
-      const url = new URL(window.location.href);
-      const currency = url.searchParams.get("currency") || "EUR";
-
-      const balanceStr = url.searchParams.get("balance") || "0";
-      const betStr = url.searchParams.get("bet") || "0";
-
-      const balance = Number(balanceStr);
-      const bet = Number(betStr);
-
-      return {
-        currency,
-        balance: Number.isFinite(balance) ? balance : 0,
-        bet: Number.isFinite(bet) ? bet : 0
-      };
-    }
-
-    const initParams = getInitParams();
-
-    // -------------------------
-    //  Viewport measurement (WKWebView safe)
-    // -------------------------
-    function getViewportCSSSize() {
-      // На iOS WKWebView наиболее стабильна visualViewport
-      const vv = window.visualViewport;
-
-      const w = vv ? Math.round(vv.width)  : Math.round(window.innerWidth);
-      const h = vv ? Math.round(vv.height) : Math.round(window.innerHeight);
-
-      // safety
-      return {
-        w: Math.max(1, w),
-        h: Math.max(1, h)
-      };
-    }
-
-    // -------------------------
-    //  Apply CSS vars + resize canvas
-    //  (важно: выставляем и CSS size, и pixel buffer)
-    // -------------------------
-    function applyLayout() {
+    function resizeCanvas() {
       const dpr = window.devicePixelRatio || 1;
-      const { w: wCss, h: hCss } = getViewportCSSSize();
+      const wCss = Math.round(window.innerWidth);
+      const hCss = viewportHeight();
 
-      // CSS vars: чтобы html/body/canvas жили одной высотой
-      document.documentElement.style.setProperty("--app-w", wCss + "px");
-      document.documentElement.style.setProperty("--app-h", hCss + "px");
+      // Размер в device pixels (важно для четкости)
+      const w = Math.floor(wCss * dpr);
+      const h = Math.floor(hCss * dpr);
 
-      // ЯВНО фиксируем CSS размер canvas (важно для Unity/DOM согласованности)
-      canvas.style.width = wCss + "px";
-      canvas.style.height = hCss + "px";
-
-      // Pixel buffer (device pixels) — для четкости
-      const wPx = Math.floor(wCss * dpr);
-      const hPx = Math.floor(hCss * dpr);
-
-      if (canvas.width !== wPx || canvas.height !== hPx) {
-        canvas.width = wPx;
-        canvas.height = hPx;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
       }
-
-      // (опционально) лог в хост для диагностики
-      // window.sendToHost("Viewport", { wCss, hCss, wPx, hPx, dpr });
     }
 
-    // -------------------------
-    //  Prime sync: несколько прогревов
-    //  (WKWebView часто меняет viewport через 1-3 кадра)
-    // -------------------------
+    // синхронизация высоты + canvas
+    function syncLayout() {
+      setAppHeight();
+      resizeCanvas();
+    }
+
+    // Прогрев: iOS часто пересчитывает viewport через кадр/два
     function primeSync() {
-      applyLayout();
-      requestAnimationFrame(() => applyLayout());
-      requestAnimationFrame(() => applyLayout());
-      setTimeout(() => applyLayout(), 50);
-      setTimeout(() => applyLayout(), 250);
+      syncLayout();
+      requestAnimationFrame(syncLayout);
+      setTimeout(syncLayout, 50);
+      setTimeout(syncLayout, 250);
     }
 
-    // События
-    window.addEventListener("resize", applyLayout);
+    window.addEventListener("resize", syncLayout);
     window.addEventListener("orientationchange", primeSync);
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", applyLayout);
-      window.visualViewport.addEventListener("scroll", applyLayout);
+      window.visualViewport.addEventListener("resize", syncLayout);
+      window.visualViewport.addEventListener("scroll", syncLayout);
     }
 
-    // Дополнительные точки синхронизации (полезно в WKWebView)
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) primeSync();
-    });
-
-    document.addEventListener("DOMContentLoaded", primeSync, { once: true });
-    window.addEventListener("load", primeSync);
-
-    // Первичная синхронизация сразу
+    // сначала прибиваем layout
     primeSync();
 
-    // -------------------------
-    //  Unity config
-    // -------------------------
-    const config = {
-      arguments: [],
-      dataUrl: buildUrl + "/Web.data",
-      frameworkUrl: buildUrl + "/Web.framework.js",
-      codeUrl: buildUrl + "/Web.wasm",
-      streamingAssetsUrl: "StreamingAssets",
-      companyName: "DefaultCompany",
-      productName: "Slots2",
-      productVersion: "1.5.0",
-      // matchWebGLToCanvasSize: true, // можно включить в новых версиях Unity (если поддерживается)
-    };
-
-    // -------------------------
-    //  Load loader.js and create instance
-    // -------------------------
+    // грузим loader.js
     const script = document.createElement("script");
     script.src = loaderUrl;
 
@@ -265,21 +258,16 @@
         return;
       }
 
-      // ВАЖНО: ещё раз выровнять layout ПЕРЕД стартом Unity
-      primeSync();
-
       createUnityInstance(canvas, config).then((unityInstance) => {
         window.unityInstance = unityInstance;
 
-        // Ещё раз после старта Unity (Unity может повлиять на layout)
+        // еще раз после инициализации Unity
         primeSync();
 
-        // Init params -> Unity
         const payload = JSON.stringify(initParams);
-        try { unityInstance.SendMessage("Bridge", "ApplyInitParams", payload); } catch (e) {}
+        try { unityInstance.SendMessage("Bridge", "ApplyInitParams", payload); } catch (e) { }
 
         hideLoading();
-
       }).catch((err) => {
         console.error(err);
         showLoading("Failed to init game");
@@ -295,4 +283,5 @@
     document.body.appendChild(script);
   </script>
 </body>
+
 </html>
